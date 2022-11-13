@@ -18,66 +18,56 @@ connectivity-only ...
 v,verbose   increase verbosity (can be used more than once)
 """
 
+#FIXME: It should not print a chunked file as "tree".
 def report_item(commit_prefix, item, verbosity):
-    if not item:
-        assert commit_prefix
-        log(commit_prefix + '\n')
+    assert verbosity > 0, "don't call report_item if not verbose"
+
+    if verbosity < 3 and item.type == b'blob':
+        return
+    # Don't print mangled paths unless the verbosity is over 3.
+    if verbosity < 4 and item.chunk_path and item.chunk_path != [b'']:
         return
 
-    chunk_path = item.chunk_path
-    if chunk_path:
-        if verbosity < 4:
-            return
+    typestr = {
+        b'commit':  "cmmt",
+        b'tree':    "tree",
+        b'blob':    "blob",
+        None:       "????",
+    }
+    log(f"{hexlify(item.oid).decode()} ({typestr[item.type]}): {commit_prefix}")
+
+    if (item.type == b'commit'):
+        log('\n')
+        return
+
+    if verbosity >=4 and item.chunk_path:
         path = []
-        if commit_prefix:
-            path.append(commit_prefix)
-        path.append(path_msg(b''.join(item.path)))
-        path.append(path_msg(b''.join(chunk_path)))
-        if item.type == b'tree' and item.path:
-            path.append('')  # adds trailing slash
-        log('/'.join(path) + '\n')
+        path += item.path
+        path += item.chunk_path
+        if item.type == b'tree':
+            path.append(b'')  # adds trailing slash
+        log(b': ' + b'/'.join(path) + b'\n')
         return
 
     # Top commit, for example has none.
     demangled = git.demangle_name(item.path[-1], item.mode)[0] if item.path \
                 else None
-
-    # Don't print mangled paths unless the verbosity is over 3.
     if demangled:
         ps = b'/'.join(item.path[:-1] + [demangled])
-        if verbosity == 1:
-            path = []
-            if commit_prefix:
-                path.append(commit_prefix)
-            path.append(path_msg(ps))
-            if item.type == b'tree' and item.path:
-                path.append('')  # adds trailing slash
-            qprogress('/'.join(path) + '\r')
-        elif (verbosity > 1 and item.type == b'tree') \
-             or (verbosity > 2 and item.type == b'blob'):
-            # log(commit_prefix + ('/' if commit_prefix else '')
-            #     + path_msg(ps) + ('/' if item.type == b'tree' and item.path else '')
-            #     + '\n')
-            if commit_prefix:
-                path = commit_prefix + path_msg(ps)
-            else:
-                path = path_msg(ps)
-            if item.type == b'tree' and item.path:
-                log(path + '/\n')
-            else:
-                log(path + '\n')
-    elif verbosity > 3:
+    else:
         ps = b'/'.join(item.path)
-        path = []
-        if commit_prefix:
-            path.append(commit_prefix)
-        path.append(path_msg(ps))
-        if item.type == b'tree' and item.path:
-            path.append('')  # adds trailing slash
-        log('/'.join(path) + '\n')
+    path = path_msg(ps)
+    if item.type == b'tree':
+        path += "/"
 
-def report_missing_oidx(oidx, out):
-    out.write(b'missing ' + oidx + b'\n')
+    if verbosity == 1:
+        qprogress(path + '\r')
+    elif (verbosity == 2 and item.type == b'tree') or (verbosity > 2):
+        log(f": {path}\n")
+
+def report_missing_oidx(item, out):
+    report_item("is missing:", item, 4)
+
 
 # FIXME: does gc walk all tags?
 
@@ -97,7 +87,7 @@ def fsck_ref(ref, oid, visited, *, commit_hash=False, connectivity_only=False,
     commit_prefix = ref_prefix + ' '
     for item in git.walk_object(cat_pipe.get, hexlify(oid), stop_at=stop_at,
                                 include_data=(not connectivity_only),
-                                for_missing=lambda oidx: report_missing_oidx(oidx, out)):
+                                for_missing=lambda item: report_missing_oidx(item, out)):
         if verbose:
             if item.type == b'commit':
                 commit = git.parse_commit(item.data)
@@ -105,8 +95,7 @@ def fsck_ref(ref, oid, visited, *, commit_hash=False, connectivity_only=False,
                 commit_prefix = ref_prefix + strftime('%Y-%m-%d-%H%M%S', localtime(commit_utc))
                 if commit_hash:
                     commit_prefix += commit.tree.decode('ascii')
-                commit_prefix += ' '
-                report_item(commit_prefix, None, verbose)
+                report_item(commit_prefix, item, verbose)
             else:
                 report_item(commit_prefix, item, verbose)
         if item.type in (b'tree', b'commit'):

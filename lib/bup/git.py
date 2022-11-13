@@ -1509,7 +1509,14 @@ def walk_object(get_ref, oidx, stop_at=None, include_data=None,
         get_oidx, typ, _ = next(item_it)
 
         if not get_oidx:
-            for_missing(oidx)
+            for_missing(
+                WalkItem(
+                    oid=oid,
+                    type=typ,
+                    chunk_path=chunk_path,
+                    path=parent_path,
+                    mode=mode,
+                    data=None))
             continue
 
         if typ == b'blob':
