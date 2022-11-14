@@ -144,12 +144,10 @@ class TagInfo:
                  'tagger_name', 'tagger_mail', 'tagger_sec', 'tagger_tz')
 
 def parse_tag(content):
-    print(repr(content))
     m = re.match(_tag_rx, content)
     if not m:
         raise Exception('cannot parse tag %r' % content)
     matches = m.groupdict()
-    print(repr(matches))
     tag = TagInfo()
     tag.object = matches['object']
     tag.type = matches['type']
