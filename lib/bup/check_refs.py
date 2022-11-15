@@ -65,8 +65,8 @@ def report_item(commit_prefix, item, verbosity):
     elif (verbosity == 2 and item.type == b'tree') or (verbosity > 2):
         log(f": {path}\n")
 
-def report_missing_oidx(item, commit_context, out):
-    report_item(f"non-existing object, referenced by commit {commit_context}", item, 4)
+def report_missing_oidx(item, oidx_of_context, type_of_context, out):
+    report_item(f"non-existing object, referenced by {type_of_context.decode()} {oidx_of_context.decode()}", item, 4)
 
 
 # FIXME: does gc walk all tags?
@@ -87,7 +87,7 @@ def fsck_ref(ref, oid, visited, *, commit_hash=False, connectivity_only=False,
     commit_prefix = ref_prefix + ' '
     for item in git.walk_object(cat_pipe.get, hexlify(oid), stop_at=stop_at,
                                 include_data=(not connectivity_only),
-                                for_missing=lambda item, commit_context: report_missing_oidx(item, commit_context, out)):
+                                for_missing=lambda item, oidx_of_context, type_of_context: report_missing_oidx(item, oidx_of_context, type_of_context, out)):
         if verbose:
             if item.type == b'commit':
                 commit = git.parse_commit(item.data)

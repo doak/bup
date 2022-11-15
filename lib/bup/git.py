@@ -1487,7 +1487,8 @@ def walk_object(get_ref, oidx, stop_at=None, include_data=None,
     """
     # Maintain the pending stack on the heap to avoid stack overflow
     pending = [(oidx, [], [], None)]
-    last_valid_commit = None
+    last_valid_object = oidx
+    last_valid_object_type = exo([b'git', b'cat-file', b'-t', oidx])[0][:-1]
     while len(pending):
         oidx, parent_path, chunk_path, mode = pending.pop()
         oid = unhexlify(oidx)
@@ -1516,7 +1517,8 @@ def walk_object(get_ref, oidx, stop_at=None, include_data=None,
                     path=parent_path,
                     mode=mode,
                     data=None),
-                last_valid_commit.decode())
+                last_valid_object,
+                last_valid_object_type)
             continue
 
         if typ == b'blob':
@@ -1532,6 +1534,7 @@ def walk_object(get_ref, oidx, stop_at=None, include_data=None,
 
         if typ == b'commit':
             last_valid_commit = oidx
+            last_valid_object_type = typ
 
         # FIXME: set the mode based on the type when the mode is None
         if typ == b'blob' and not include_data:
